@@ -18,6 +18,25 @@ root.iconphoto(False, render)
 root.resizable(width=True, height=True)
 root.geometry('{}x{}'.format(1366, 748))
 
+#functions perfoming network analysis andm processing
+def capture_traffic(interf):
+    if interf == "Select Interface":
+        #create a top level window
+        popup = tk.Toplevel(root)
+        popup.geometry("750x250")
+        #create entry widget into top level
+        label = tk.Label(popup, text="Please Select a Valid Interface")
+        label.place(relx=0.5,rely=0.5,anchor=tk.CENTER)
+    else:
+        capture_text.set("Stop Capture")
+        import capture.capture as packets_cap
+        packets_cap.interface = interf
+        packets_cap.file = "festus.pcap"
+        packets_cap.packet_capture()
+        packets_cap.permissions()
+        print("Please Select an Interface")
+
+
 # define main frames/containers
 topmost_frame = tk.Frame(root, bg='purple', width=1366, height=30, pady=3)
 top_frame = tk.Frame(root, bg='blue', width=1366, height=90, pady=3)
@@ -43,7 +62,7 @@ interface_chosen.set('Select Interface')
 #chose from available interfaces
 interface['values'] = tuple(addrs)
 capture_text = tk.StringVar()
-capture_button = tk.Button(topmost_frame, textvariable=capture_text)
+capture_button = tk.Button(topmost_frame, textvariable=capture_text, command=lambda:[capture_traffic(interface_chosen.get())])
 capture_text.set("Capture Traffic")
 
 # layout for topmost frame widgets
