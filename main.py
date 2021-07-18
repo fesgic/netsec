@@ -41,7 +41,7 @@ interface_chosen = tk.StringVar()
 interface = ttk.Combobox(topmost_frame, textvariable=interface_chosen)
 interface_chosen.set('Select Interface')
 #chose from available interfaces
-
+interface['values'] = tuple(addrs)
 capture_text = tk.StringVar()
 capture_button = tk.Button(topmost_frame, textvariable=capture_text)
 capture_text.set("Capture Traffic")
