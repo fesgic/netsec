@@ -1,0 +1,7 @@
+tk
+pillow
+PyPDF2
+Tkcalendar
+psutil
+scapy
+matplotlib
