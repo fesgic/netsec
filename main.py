@@ -1,12 +1,17 @@
+import threading
 import tkinter as tk
 from tkinter import CENTER
 from tkinter import ttk
 
 from PIL import Image, ImageTk
-import PyPDF2
+from threading import Thread
+
+# self defined modules imports
 from interfaces.interfaces import addrs
 
-#network processing imports
+# hold data packets
+
+# network processing imports
 from tkinter.filedialog import askopenfile
 
 # define root UI
@@ -18,23 +23,36 @@ root.iconphoto(False, render)
 root.resizable(width=True, height=True)
 root.geometry('{}x{}'.format(1366, 748))
 
-#functions perfoming network analysis andm processing
-def capture_traffic(interf):
-    if interf == "Select Interface":
-        #create a top level window
+# functions performing network analysis and processing
+def select_interf(interf):
+    if interf == 'Select Interface':
+        # create a top level window
         popup = tk.Toplevel(root)
-        popup.geometry("750x250")
-        #create entry widget into top level
+        popup.geometry("550x250")
+        # create entry widget into top level
         label = tk.Label(popup, text="Please Select a Valid Interface")
-        label.place(relx=0.5,rely=0.5,anchor=tk.CENTER)
-    else:
-        capture_text.set("Stop Capture")
-        import capture.capture as packets_cap
-        packets_cap.interface = interf
-        packets_cap.file = "festus.pcap"
-        packets_cap.packet_capture()
-        packets_cap.permissions()
-        print("Please Select an Interface")
+        label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+    elif capture_text.get() == "Stop Capture":
+            capture_text.set("Capture Traffic")
+
+def capture_traffic(interf):
+    if interf != "Select Interface":
+        sniffThread = threading.Thread(target=traffic_scapy, args=(interf,))
+        if capture_text.get() == "Capture Traffic":
+            sniffThread.start()
+        elif capture_text.get() == "Stop Capture":
+            sniffThread.stop()
+            capture_text.set("Capture Traffic")
+
+
+def traffic_scapy(interf):
+    capture_text.set("Stop Capture")
+    import capture.capture as packets_cap
+    packets_cap.interface = interf
+    packets_cap.file = "festus.pcap"
+    packets_cap.packet_capture()
+    packets_cap.permissions()
+    print("Please Select an Interface")
 
 
 # define main frames/containers
@@ -59,15 +77,15 @@ interfaces_label = tk.Label(topmost_frame, text='Select interface', width=15, he
 interface_chosen = tk.StringVar()
 interface = ttk.Combobox(topmost_frame, textvariable=interface_chosen)
 interface_chosen.set('Select Interface')
-#chose from available interfaces
+# chose from available interfaces
 interface['values'] = tuple(addrs)
 capture_text = tk.StringVar()
-capture_button = tk.Button(topmost_frame, textvariable=capture_text, command=lambda:[capture_traffic(interface_chosen.get())])
+capture_button = tk.Button(topmost_frame, textvariable=capture_text, command=lambda:[capture_traffic(interface_chosen.get()), select_interf(interface_chosen.get())])
 capture_text.set("Capture Traffic")
 
 # layout for topmost frame widgets
 interfaces_label.grid(column=1, row=0)
-interface.grid(column=3,row=0)
+interface.grid(column=3, row=0)
 capture_button.place(relx=0.5, rely=0.5, anchor=CENTER)
 
 # create frames to hold contents of top frame organised

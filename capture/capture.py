@@ -6,9 +6,9 @@ from scapy.all import *
 
 
 def packet_capture():
-    pkts = sniff(iface=interface, prn=lambda x: x.summary())
+    pkts = sniff(iface=interface, prn= lambda  x: x.summary())
     wrpcap(file, pkts)
-    print(pkts)
+
 
 
 def permissions():
