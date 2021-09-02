@@ -1,18 +1,28 @@
+import sys
 import threading
 import tkinter as tk
 from tkinter import CENTER
 from tkinter import ttk
 
 from PIL import Image, ImageTk
+from datetime import datetime
 from threading import Thread
+#scapy and network processing modules
+from scapy.layers.inet import IP
+from scapy.layers.http import *
+from scapy.layers.l2 import ARP
+from scapy.sessions import TCPSession
+from scapy.sendrecv import sniff
+from scapy.all import rdpcap
 
 # self defined modules imports
+from scapy.utils import wrpcap
+
 from interfaces.interfaces import addrs
 
-# hold data packets
-
-# network processing imports
-from tkinter.filedialog import askopenfile
+#connect to database
+import mysql.connector
+from mysql.connector import errors, Error
 
 # define root UI
 root = tk.Tk()
@@ -44,15 +54,50 @@ def capture_traffic(interf):
             sniffThread.stop()
             capture_text.set("Capture Traffic")
 
-
+global file
+file = "fes.pcap"
 def traffic_scapy(interf):
     capture_text.set("Stop Capture")
-    import capture.capture as packets_cap
-    packets_cap.interface = interf
-    packets_cap.file = "festus.pcap"
-    packets_cap.packet_capture()
-    packets_cap.permissions()
-    print("Please Select an Interface")
+    import logging
+    import os
+    logging.getLogger("scapy").setLevel(logging.CRITICAL)
+
+    def packet_capture(pkt):
+        try:
+            now = datetime.now()
+            formatted_date = now.strftime("%Y-%m-%d %H-%M-%S")
+            connection = mysql.connector.connect(host='localhost',
+                                                 database='netsec',
+                                                 user='xxxxxx',
+                                                 password='xxxxxxxx')
+            if connection.is_connected():
+                db_Info = connection.get_server_info()
+                print("Connected to mysql server version", db_Info)
+            cursor =  connection.cursor()
+            if TCP in pkt:
+                insert_query = f"""
+                           insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
+                                       values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "TCP", "{formatted_date}");
+                            """
+                cursor.execute(insert_query)
+            connection.commit()
+        #wrpcap(file, pkt)
+        except Error as e:
+           print("Error while connecting to mysql", e)
+        finally:
+            if connection.is_connected():
+                cursor.close()
+                connection.close()
+                print("Mysql connection closed")
+
+    sniff(iface=interf, prn=packet_capture, store=0)
+    #import capture
+    #import capture.capture as packets_cap
+    #packets_cap.interface = interf
+    #packets_cap.file = "festus.pcap"
+    #packets_cap.packet_capture()
+    #packets_cap.permissions()
+    #print("Please Select an Interface")
 
 
 # define main frames/containers
