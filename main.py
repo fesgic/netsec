@@ -1,16 +1,24 @@
 import sys
 import threading
+
+from scapy.layers.dns import DNS
+
+lock = threading.Lock()
 import tkinter as tk
-from tkinter import CENTER
+from time import strftime
+from tkinter import CENTER, END, LEFT, DISABLED, ACTIVE, NORMAL
 from tkinter import ttk
 
+import canvas as canvas
 from PIL import Image, ImageTk
 from datetime import datetime
 from threading import Thread
-#scapy and network processing modules
+# scapy and network processing modules
 from scapy.layers.inet import IP
 from scapy.layers.http import *
-from scapy.layers.l2 import ARP
+from scapy.layers.tls import *
+from scapy.layers.l2 import ARP, Ether
+from scapy.layers.tls.record import TLS
 from scapy.sessions import TCPSession
 from scapy.sendrecv import sniff
 from scapy.all import rdpcap
@@ -19,8 +27,9 @@ from scapy.all import rdpcap
 from scapy.utils import wrpcap
 
 from interfaces.interfaces import addrs
+import matplotlib.pyplot as plt
 
-#connect to database
+# connect to database
 import mysql.connector
 from mysql.connector import errors, Error
 
@@ -33,6 +42,7 @@ root.iconphoto(False, render)
 root.resizable(width=True, height=True)
 root.geometry('{}x{}'.format(1366, 748))
 
+
 # functions performing network analysis and processing
 def select_interf(interf):
     if interf == 'Select Interface':
@@ -43,7 +53,8 @@ def select_interf(interf):
         label = tk.Label(popup, text="Please Select a Valid Interface")
         label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
     elif capture_text.get() == "Stop Capture":
-            capture_text.set("Capture Traffic")
+        capture_text.set("Capture Traffic")
+
 
 def capture_traffic(interf):
     if interf != "Select Interface":
@@ -54,8 +65,11 @@ def capture_traffic(interf):
             sniffThread.stop()
             capture_text.set("Capture Traffic")
 
+
 global file
 file = "fes.pcap"
+
+
 def traffic_scapy(interf):
     capture_text.set("Stop Capture")
     import logging
@@ -68,22 +82,46 @@ def traffic_scapy(interf):
             formatted_date = now.strftime("%Y-%m-%d %H-%M-%S")
             connection = mysql.connector.connect(host='localhost',
                                                  database='netsec',
-                                                 user='xxxxxx',
-                                                 password='xxxxxxxx')
+                                                 user='festus',
+                                                 password='fg68211h')
             if connection.is_connected():
                 db_Info = connection.get_server_info()
                 print("Connected to mysql server version", db_Info)
-            cursor =  connection.cursor()
-            if TCP in pkt:
+            cursor = connection.cursor()
+            if HTTP in pkt:
                 insert_query = f"""
                            insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
-                                       values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "TCP", "{formatted_date}");
+                                       values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "HTTP", "{formatted_date}");
                             """
                 cursor.execute(insert_query)
-            connection.commit()
-        #wrpcap(file, pkt)
+                connection.commit()
+            elif ARP in pkt and pkt[ARP].op == 1:
+                insert_query = f"""
+                           insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
+                                       values ("{pkt[Ether].src}","{pkt[Ether].dst}","{pkt[ARP].psrc}", "{pkt[ARP].pdst}", "ARP", "{formatted_date}");
+                            """
+                cursor.execute(insert_query)
+                connection.commit()
+            elif ARP in pkt and pkt[ARP].op == 2:
+                insert_query = f"""
+                           insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
+                                       values ("{pkt[Ether].hwsrc}","{pkt[Ether].hwdst}","{pkt[ARP].psrc}", "{pkt[ARP].pdst}", "ARP", "{formatted_date}");
+                            """
+                cursor.execute(insert_query)
+                connection.commit()
+            elif TLS in pkt:
+                insert_query = f"""
+                           insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
+                                       values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "HTTPS", "{formatted_date}");
+                            """
+                cursor.execute(insert_query)
+                connection.commit()
+
+
+
+        # wrpcap(file, pkt)
         except Error as e:
-           print("Error while connecting to mysql", e)
+            print("Error while connecting to mysql", e)
         finally:
             if connection.is_connected():
                 cursor.close()
@@ -91,20 +129,136 @@ def traffic_scapy(interf):
                 print("Mysql connection closed")
 
     sniff(iface=interf, prn=packet_capture, store=0)
-    #import capture
-    #import capture.capture as packets_cap
-    #packets_cap.interface = interf
-    #packets_cap.file = "festus.pcap"
-    #packets_cap.packet_capture()
-    #packets_cap.permissions()
-    #print("Please Select an Interface")
+    # import capture
+    # import capture.capture as packets_cap
+    # packets_cap.interface = interf
+    # packets_cap.file = "festus.pcap"
+    # packets_cap.packet_capture()
+    # packets_cap.permissions()
+    # print("Please Select an Interface")
 
+
+# display live traffic to interface
+def live_traffic():
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            database="netsec",
+            user="festus",
+            password="fg68211h"
+        )
+        if connection.is_connected():
+            db_Info = connection.get_server_info()
+            print("Connected to mysql Server", db_Info)
+        cursor = connection.cursor()
+        traffic_query = 'select * from traffic limit 10'
+        cursor.execute(traffic_query)
+        # get all records
+        records = cursor.fetchall()
+        print("Total number of rows is ", cursor.rowcount)
+
+        print("Printing Each Row")
+        print("Src\tDst\tSrc_IP\tDst_IP\tProtocol\tTimestamp\n")
+        # for row in records:
+        #    time = row[5].strftime("%H:%M: hrs")
+        #    print(f'{row[0]}\t{row[1]}\t{row[2]}\t{row[3]}\t{row[4]}\t{time}')
+        reports_canvas.create_text(text=records[0])
+
+    except Error as e:
+        print("Error Connecting to Mysql", e)
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("My sql connection closed")
+
+
+# traffic_overview
+# graph of traffic capture over time(count)
+def traffic_overview():
+    print("a")
+
+
+# protocol_overview
+# graph of protocol type over time
+def protocol_overview():
+    protocolview_button["state"] = ACTIVE
+    livecap_button["state"] = NORMAL
+    trafficview_button["state"] = NORMAL
+
+    def plotting_traf():
+        while protocolview_button["state"] == ACTIVE:
+            try:
+                lock.acquire()
+                connection = mysql.connector.connect(
+                    host="localhost",
+                    database="netsec",
+                    user="festus",
+                    password="fg68211h"
+                )
+                if connection.is_connected():
+                    db_Info = connection.get_server_info()
+                    print("Connected to mysql Server", db_Info)
+                cursor = connection.cursor()
+                traffic_query = 'select time_stamp,protocol,count(protocol) from traffic group by time_stamp;'
+                cursor.execute(traffic_query)
+                # get all records
+                records = cursor.fetchall()
+                print("Total number of rows is ", cursor.rowcount)
+                print(f"aaa{records[0]}, {records[1]},{records[2]}")
+                timex = []
+                httpy = []
+                arpy = []
+                httpsy = []
+                dnsy = []
+                #fig = plt.figure()
+                #ax1 = fig.add_subplot(1, 1, 1)
+                for i in records:
+                    a = i[0].strftime("%H:%M:")
+                    if i[1] == "HTTP":
+                        httpy.append(i[2])
+                        arpy.append(0)
+                        httpsy.append(0)
+                        dnsy.append(0)
+                    elif i[1] == "ARP":
+                        arpy.append(i[2])
+                        httpy.append(0)
+                        httpsy.append(0)
+                        dnsy.append(0)
+                    elif i[1] == "HTTPS":
+                        httpsy.append(i[2])
+                        arpy.append(0)
+                        httpy.append(0)
+                        dnsy.append(0)
+                    elif i[1] == "DNS":
+                        dnsy.append(i[2])
+                        httpy.append(0)
+                        httpsy.append(0)
+                        arpy.append(0)
+                    timex.append(a)
+                plt.cla()
+                print(f"{httpy}\n{arpy}\n{dnsy}\n{timex}")
+                plt.plot(timex, arpy, label="ARP", color="blue")
+                plt.plot(timex, httpy, label="HTTP", linestyle=":", color="red")
+                plt.plot(timex, httpsy, label="HTTPS", linestyle="-.", color="green")
+                plt.plot(timex, dnsy, label="DNS", color="yellow")
+                plt.show()
+                lock.release()
+            except Error as e:
+                print("Error Connecting to Mysql", e)
+            finally:
+                if connection.is_connected():
+                    cursor.close()
+                    connection.close()
+                    print("My sql connection closed")
+    graph_plot = threading.Thread(target=plotting_traf)
+    graph_plot.start()
 
 # define main frames/containers
 topmost_frame = tk.Frame(root, bg='purple', width=1366, height=30, pady=3)
 top_frame = tk.Frame(root, bg='blue', width=1366, height=90, pady=3)
-left_frame = tk.Frame(root, bg='white', width=150, height=555, pady=3)
-canvas_frame = tk.Frame(root, bg='green', width=1216, height=555, pady=3)
+left_frame = tk.Frame(root, bg='blue', width=150, height=555, pady=3)
+canvas_frame = ttk.Frame(root, width=1216, height=555)
 report_frame = tk.Frame(root, bg='orange', width=1366, height=45, pady=3)
 
 # define layout of the frames
@@ -125,7 +279,9 @@ interface_chosen.set('Select Interface')
 # chose from available interfaces
 interface['values'] = tuple(addrs)
 capture_text = tk.StringVar()
-capture_button = tk.Button(topmost_frame, textvariable=capture_text, command=lambda:[capture_traffic(interface_chosen.get()), select_interf(interface_chosen.get())])
+capture_button = tk.Button(topmost_frame, textvariable=capture_text,
+                           command=lambda: [capture_traffic(interface_chosen.get()),
+                                            select_interf(interface_chosen.get())])
 capture_text.set("Capture Traffic")
 
 # layout for topmost frame widgets
@@ -142,9 +298,9 @@ top_frame_center = tk.Frame(top_frame, bg="cyan", padx=3, pady=3)
 top_frame_right = tk.Frame(top_frame, bg="yellow", padx=3, pady=3)
 
 # layout of frames in top frame
-top_frame_left.grid(row=0, column=0, sticky='nswe')
-top_frame_center.grid(row=0, column=1, sticky='nswe')
-top_frame_right.grid(row=0, column=2, sticky='nswe')
+top_frame_left.grid(row=0, column=0, sticky='nwe')
+top_frame_center.grid(row=0, column=1, sticky='nwe')
+top_frame_right.grid(row=0, column=2, sticky='nwe')
 
 # create widgets for top frame
 time_label = tk.Label(top_frame_left, text='Time:', width=15, height=2)
@@ -166,13 +322,15 @@ analyze_button.grid(columnspan=2, row=0, column=12, padx=30, pady=15)
 
 # create widgets for left frame
 livecap_text = tk.StringVar()
-livecap_button = tk.Button(left_frame, textvariable=livecap_text, padx=0, pady=0)
+livecap_button = tk.Button(left_frame, textvariable=livecap_text, padx=0, pady=0, command=lambda: [live_traffic()])
 livecap_text.set("Live Capture")
 trafficview_text = tk.StringVar()
-trafficview_button = tk.Button(left_frame, textvariable=trafficview_text, padx=0, pady=0)
+trafficview_button = tk.Button(left_frame, textvariable=trafficview_text, padx=0, pady=0,
+                               command=lambda: [traffic_overview()])
 trafficview_text.set("Traffic Overview")
 protocolview_text = tk.StringVar()
-protocolview_button = tk.Button(left_frame, textvariable=protocolview_text, padx=0, pady=0)
+protocolview_button = tk.Button(left_frame, textvariable=protocolview_text, padx=0, pady=0,
+                                command=lambda: [protocol_overview()])
 protocolview_text.set("Protocol Overview")
 
 # layout for left frame widgets
@@ -181,14 +339,23 @@ trafficview_button.grid(row=1, column=1, columnspan=2)
 protocolview_button.grid(row=3, column=1, columnspan=2)
 
 # create widgets for right frame
-reports_canvas = tk.Canvas(canvas_frame, bg="red")
+reports_canvas = tk.Canvas(canvas_frame)
+
+
+# e = tk.Entry(reports_canvas, width=10, fg='blue')
+# e.grid(columnspan=6, column=5, row=5)
+# scrollbar = ttk.Scrollbar(reports_canvas, orient="vertical", command=reports_canvas.yview)
 
 # layout for right frame widgets
 # reports_canvas.grid()
 
+def download_reports():
+    print("download_reports")
+
+
 # create widgets for report_frame
 download_report_text = tk.StringVar()
-download_report = tk.Button(report_frame, textvariable=download_report_text)
+download_report = tk.Button(report_frame, textvariable=download_report_text, command=lambda: [download_reports()])
 download_report_text.set("Download Report")
 
 # layout for report_frame widgets
