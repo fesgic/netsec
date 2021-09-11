@@ -1,12 +1,13 @@
 import sys
 import threading
 
+import matplotlib.pyplot
 from scapy.layers.dns import DNS
 
 lock = threading.Lock()
 import tkinter as tk
 from time import strftime
-from tkinter import CENTER, END, LEFT, DISABLED, ACTIVE, NORMAL
+from tkinter import CENTER, END, LEFT, DISABLED, ACTIVE, NORMAL, RIGHT, Y, X, BOTH
 from tkinter import ttk
 
 import canvas as canvas
@@ -88,7 +89,9 @@ def traffic_scapy(interf):
                 db_Info = connection.get_server_info()
                 print("Connected to mysql server version", db_Info)
             cursor = connection.cursor()
-            if HTTP in pkt:
+            if HTTP in pkt and HTTPResponse in pkt:
+                reports_canvas.create_text(100, 10, fill="darkblue", font="Times 20 italic bold",
+                                           text="Click the bubbles that are multiples of two.\n")
                 insert_query = f"""
                            insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
                                        values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "HTTP", "{formatted_date}");
@@ -110,6 +113,8 @@ def traffic_scapy(interf):
                 cursor.execute(insert_query)
                 connection.commit()
             elif TLS in pkt:
+                reports_canvas.create_text(100, 10, fill="darkblue", font="Times 20 italic bold",
+                                           text="Click the bubbles that are multiples of two.\n")
                 insert_query = f"""
                            insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
                                        values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "HTTPS", "{formatted_date}");
@@ -151,18 +156,45 @@ def live_traffic():
             db_Info = connection.get_server_info()
             print("Connected to mysql Server", db_Info)
         cursor = connection.cursor()
-        traffic_query = 'select * from traffic limit 10'
+        traffic_query = 'select * from traffic;'
         cursor.execute(traffic_query)
         # get all records
         records = cursor.fetchall()
         print("Total number of rows is ", cursor.rowcount)
-
+        print(records)
         print("Printing Each Row")
         print("Src\tDst\tSrc_IP\tDst_IP\tProtocol\tTimestamp\n")
         # for row in records:
         #    time = row[5].strftime("%H:%M: hrs")
         #    print(f'{row[0]}\t{row[1]}\t{row[2]}\t{row[3]}\t{row[4]}\t{time}')
-        reports_canvas.create_text(text=records[0])
+        tree = ttk.Treeview(reports_canvas, column=("c1", "c2", "c3", "c4", "c5", "c6"), show='headings', height=30)
+
+        tree.column("#1", anchor=tk.CENTER)
+        tree.heading("#1", text="SRC")
+        tree.column("#2", anchor=tk.CENTER)
+        tree.heading("#2", text="DST")
+        tree.column("#3", anchor=tk.CENTER)
+        tree.heading("#3", text="SRC_IP")
+        tree.column("#4", anchor=tk.CENTER)
+        tree.heading("#4", text="DST_IP")
+        tree.column("#5", anchor=tk.CENTER)
+        tree.heading("#5", text="PROTOCOL")
+        tree.column("#6", anchor=tk.CENTER)
+        tree.heading("#6    ", text="TIMESTAMP")
+        tree.pack(fill=BOTH)
+        for row in records:
+            tree.insert("", tk.END, values=row)
+
+
+        #lst = records
+
+        #for i in range(len(records)):
+        #    for j in range(len(records[0])):
+          #      live_tr = tk.Entry(reports_canvas, width=1, fg='blue',
+        #                           font=('Arial', 16))
+         #       live_tr.grid(row=i, column=j)
+          #      live_tr.insert(END, lst[i][j])
+
 
     except Error as e:
         print("Error Connecting to Mysql", e)
@@ -211,8 +243,8 @@ def protocol_overview():
                 arpy = []
                 httpsy = []
                 dnsy = []
-                #fig = plt.figure()
-                #ax1 = fig.add_subplot(1, 1, 1)
+                # fig = plt.figure()
+                # ax1 = fig.add_subplot(1, 1, 1)
                 for i in records:
                     a = i[0].strftime("%H:%M:")
                     if i[1] == "HTTP":
@@ -238,6 +270,9 @@ def protocol_overview():
                     timex.append(a)
                 plt.cla()
                 print(f"{httpy}\n{arpy}\n{dnsy}\n{timex}")
+                matplotlib.pyplot.title("Protocol Graph")
+                matplotlib.pyplot.xlabel("Time")
+                matplotlib.pyplot.ylabel("Protocol")
                 plt.plot(timex, arpy, label="ARP", color="blue")
                 plt.plot(timex, httpy, label="HTTP", linestyle=":", color="red")
                 plt.plot(timex, httpsy, label="HTTPS", linestyle="-.", color="green")
@@ -251,24 +286,25 @@ def protocol_overview():
                     cursor.close()
                     connection.close()
                     print("My sql connection closed")
+
     graph_plot = threading.Thread(target=plotting_traf)
     graph_plot.start()
 
-# define main frames/containers
-topmost_frame = tk.Frame(root, bg='purple', width=1366, height=30, pady=3)
-top_frame = tk.Frame(root, bg='blue', width=1366, height=90, pady=3)
-left_frame = tk.Frame(root, bg='blue', width=150, height=555, pady=3)
-canvas_frame = ttk.Frame(root, width=1216, height=555)
-report_frame = tk.Frame(root, bg='orange', width=1366, height=45, pady=3)
 
+# define main frames/containers
+topmost_frame = tk.Frame(root, bg='purple', width=1366, height=30, pady=0.5)
+# top_frame = tk.Frame(root, bg='blue', width=1366, height=90, pady=3)
+left_frame = tk.Frame(root, bg='blue', width=150, height=600, pady=0, padx=0.5)
+canvas_frame = tk.Frame(root, width=1216, height=600, bg='yellow', pady=0.5)
+report_frame = tk.Frame(root, bg='orange', width=1366, height=45, pady=0.5)
 # define layout of the frames
 root.grid_rowconfigure(1, weight=1)
 root.grid_columnconfigure(0, weight=1)
 
 topmost_frame.grid(row=0, sticky='ew')
-top_frame.grid(row=1, sticky='news')
-left_frame.grid(row=3, sticky='nsw')
-canvas_frame.grid(row=3, sticky='nse')
+# top_frame.grid(row=1, sticky='new')
+left_frame.grid(row=2, sticky='nsw')
+canvas_frame.grid(row=2, sticky='nse')
 report_frame.grid(row=5, sticky='ew')
 
 # create widgets for topmost frame
@@ -290,35 +326,35 @@ interface.grid(column=3, row=0)
 capture_button.place(relx=0.5, rely=0.5, anchor=CENTER)
 
 # create frames to hold contents of top frame organised
-top_frame.grid_rowconfigure(0, weight=1)
-top_frame.grid_columnconfigure(1, weight=1)
+# top_frame.grid_rowconfigure(0, weight=1)
+# top_frame.grid_columnconfigure(1, weight=1)
 
-top_frame_left = tk.Frame(top_frame, bg="red", padx=3, pady=3)
-top_frame_center = tk.Frame(top_frame, bg="cyan", padx=3, pady=3)
-top_frame_right = tk.Frame(top_frame, bg="yellow", padx=3, pady=3)
+# top_frame_left = tk.Frame(top_frame, bg="red", padx=3, pady=3)
+# top_frame_center = tk.Frame(top_frame, bg="cyan", padx=3, pady=3)
+# top_frame_right = tk.Frame(top_frame, bg="yellow", padx=3, pady=3)
 
 # layout of frames in top frame
-top_frame_left.grid(row=0, column=0, sticky='nwe')
-top_frame_center.grid(row=0, column=1, sticky='nwe')
-top_frame_right.grid(row=0, column=2, sticky='nwe')
+# top_frame_left.grid(row=0, column=0, sticky='nwe')
+# top_frame_center.grid(row=0, column=1, sticky='nwe')
+# top_frame_right.grid(row=0, column=2, sticky='nwe')
 
 # create widgets for top frame
-time_label = tk.Label(top_frame_left, text='Time:', width=15, height=2)
-from_time_label = tk.Label(top_frame_center, text='From:', width=15, height=2)
-from_time_entry = tk.Entry(top_frame_center, background='pink', width=15)
-to_time_label = tk.Label(top_frame_center, text='To', width=15, height=2)
-to_time_entry = tk.Entry(top_frame_center, background="pink", width=15)
-analyze_text = tk.StringVar()
-analyze_button = tk.Button(top_frame_right, textvariable=analyze_text)
-analyze_text.set("Analyze")
+# time_label = tk.Label(top_frame_left, text='Time:', width=15, height=2)
+# from_time_label = tk.Label(top_frame_center, text='From:', width=15, height=2)
+# from_time_entry = tk.Entry(top_frame_center, background='pink', width=15)
+# to_time_label = tk.Label(top_frame_center, text='To', width=15, height=2)
+# to_time_entry = tk.Entry(top_frame_center, background="pink", width=15)
+# analyze_text = tk.StringVar()
+# analyze_button = tk.Button(top_frame_right, textvariable=analyze_text)
+# analyze_text.set("Analyze")
 
 # layout for top_frame widgets
-time_label.grid(columnspan=2, row=0, pady=15)
-from_time_label.grid(columnspan=2, row=0, column=0, padx=300)
-from_time_entry.grid(columnspan=2, row=1, column=0)
-to_time_label.grid(columnspan=2, row=0, column=2)
-to_time_entry.grid(columnspan=2, row=1, column=2)
-analyze_button.grid(columnspan=2, row=0, column=12, padx=30, pady=15)
+# time_label.grid(columnspan=2, row=0, pady=15)
+# from_time_label.grid(columnspan=2, row=0, column=0, padx=300)
+# from_time_entry.grid(columnspan=2, row=1, column=0)
+# to_time_label.grid(columnspan=2, row=0, column=2)
+# to_time_entry.grid(columnspan=2, row=1, column=2)
+# analyze_button.grid(columnspan=2, row=0, column=12, padx=30, pady=15)
 
 # create widgets for left frame
 livecap_text = tk.StringVar()
@@ -339,7 +375,15 @@ trafficview_button.grid(row=1, column=1, columnspan=2)
 protocolview_button.grid(row=3, column=1, columnspan=2)
 
 # create widgets for right frame
-reports_canvas = tk.Canvas(canvas_frame)
+#v = tk.Scrollbar(canvas_frame, orient='vertical')
+#v.pack(side=RIGHT, fill=Y)
+# v.grid(column=6,rowspan=5, row=0)
+reports_canvas = tk.Canvas(canvas_frame, bg="green", width=1216, height=600)
+#v.config(command=reports_canvas.yview)
+reports_canvas.pack(side=LEFT, fill=BOTH)
+
+
+# reports_canvas.grid(columnspan=5, rowspan=5, column=1, row=1)
 
 
 # e = tk.Entry(reports_canvas, width=10, fg='blue')
