@@ -1,4 +1,5 @@
 import sys
+import os
 import threading
 
 import matplotlib.pyplot
@@ -573,8 +574,11 @@ def download_reports():
         def export_table(table_name):
             header, rows = fetch_table_data(table_name)
 
+            #open folder to save file
+            basepath = "./Downloaded_Reports"
+            report_name =  os.path.join(basepath, f"{answer}_{table_name}.csv")
             #create csv file
-            f = open(f"{answer}_{table_name}.csv", "w")
+            f = open(report_name, "w")
 
             #write header
             f.write(','.join(header) + '\n')
