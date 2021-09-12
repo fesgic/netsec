@@ -199,8 +199,8 @@ def live_traffic():
         tree.column("#5", anchor=tk.CENTER)
         tree.heading("#5", text="PROTOCOL")
         tree.column("#6", anchor=tk.CENTER)
-        tree.heading("#6    ", text="TIMESTAMP")
-        tree.pack(side=LEFT)
+        tree.heading("#6", text="TIMESTAMP")
+        tree.pack(side='left')
         scroll = ttk.Scrollbar(reports_canvas, orient="vertical", command=tree.yview)
         scroll.pack(side='right', fill='y')
 
@@ -240,7 +240,7 @@ def protocol_overview():
     #protocolview_button["state"] = ACTIVE
     #livecap_button["state"] = NORMAL
     #trafficview_button["state"] = NORMAL
-
+    #reports_canvas.delete("all")
     def plotting_traf():
         while protocolview_button["state"] == ACTIVE:
             try:
@@ -331,6 +331,105 @@ def protocol_overview():
     graph_plot.start()
 
 
+def http_request_report():
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            database="netsec",
+            user="festus",
+            password="fg68211h"
+        )
+        if connection.is_connected():
+            db_Info = connection.get_server_info()
+            print("Connected to mysql Server", db_Info)
+        cursor = connection.cursor()
+        traffic_query = 'select src_ip,dst_ip,protocol,request_path,http_method,time_stamp from http_request;'
+        cursor.execute(traffic_query)
+        # get all records
+        records = cursor.fetchall()
+        print("Total number of rows is ", cursor.rowcount)
+
+        tree = ttk.Treeview(reports_canvas, column=("c1", "c2", "c3", "c4", "c5", "c6"), show='headings', height=30)
+
+        tree.column("#1", anchor=tk.CENTER)
+        tree.heading("#1", text="SRC_IP")
+        tree.column("#2", anchor=tk.CENTER)
+        tree.heading("#2", text="DST_IP")
+        tree.column("#3", anchor=tk.CENTER)
+        tree.heading("#3", text="PROTOCOL")
+        tree.column("#4", anchor=tk.CENTER)
+        tree.heading("#4", text="HTTP_METHOD")
+        tree.column("#5", anchor=tk.CENTER)
+        tree.heading("#5", text="REQUEST_PATH")
+        tree.column("#6", anchor=tk.CENTER, stretch="True")
+        tree.heading("#6", text="TIMESTAMP")
+        tree.pack(side=LEFT)
+
+        scroll = ttk.Scrollbar(reports_canvas, orient="vertical", command=tree.yview)
+        scroll.pack(side=RIGHT, fill='y')
+        tree.configure(yscrollcommand=scroll.set, style="Treeview")
+        for row in records:
+            tree.insert("", tk.END, values=row)
+
+
+    except Error as e:
+        print("Error Connecting to Mysql", e)
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("My sql connection closed")
+
+def http_response_report():
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            database="netsec",
+            user="festus",
+            password="fg68211h"
+        )
+        if connection.is_connected():
+            db_Info = connection.get_server_info()
+            print("Connected to mysql Server", db_Info)
+        cursor = connection.cursor()
+        traffic_query = 'select src_ip,dst_ip,protocol,http_statuscode,status_code_reason,time_stamp from http_response;'
+        cursor.execute(traffic_query)
+        # get all records
+        records = cursor.fetchall()
+        print("Total number of rows is ", cursor.rowcount)
+
+        tree = ttk.Treeview(reports_canvas, column=("c1", "c2", "c3", "c4", "c5", "c6"), show='headings', height=30)
+
+        tree.column("#1", anchor=tk.CENTER)
+        tree.heading("#1", text="SRC_IP")
+        tree.column("#2", anchor=tk.CENTER)
+        tree.heading("#2", text="DST_IP")
+        tree.column("#3", anchor=tk.CENTER)
+        tree.heading("#3", text="PROTOCOL")
+        tree.column("#4", anchor=tk.CENTER)
+        tree.heading("#4", text="STATUS_CODE")
+        tree.column("#5", anchor=tk.CENTER)
+        tree.heading("#5", text="CODE_REASON")
+        tree.column("#6", anchor=tk.CENTER, stretch="True")
+        tree.heading("#6", text="TIMESTAMP")
+        tree.pack(side=LEFT, fill=BOTH)
+
+        scroll = ttk.Scrollbar(reports_canvas, orient="vertical", command=tree.yview)
+        scroll.pack(side=RIGHT, fill='y')
+        tree.configure(yscrollcommand=scroll.set, style="Treeview")
+        for row in records:
+            tree.insert("", tk.END, values=row)
+
+
+    except Error as e:
+        print("Error Connecting to Mysql", e)
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("My sql connection closed")
+
+
 # define main frames/containers
 topmost_frame = tk.Frame(root, bg='purple', width=1366, height=30, pady=0.5)
 # top_frame = tk.Frame(root, bg='blue', width=1366, height=90, pady=3)
@@ -407,10 +506,11 @@ trafficview_text.set("Traffic Overview")
 
 http_label = tk.Label(left_frame, text='HTTP Protocol', width=15, height=2, bg="blue", fg="white")
 http_request_text = tk.StringVar()
-http_request_button = tk.Button(left_frame, textvariable=http_request_text, padx=0, pady=0)
+http_request_button = tk.Button(left_frame, textvariable=http_request_text, padx=0, pady=0, command=lambda:[http_request_report()])
 http_request_text.set("HTTP Requests")
 http_response_text = tk.StringVar()
-http_response_button = tk.Button(left_frame, textvariable=http_response_text, padx=0, pady=0)
+http_response_button = tk.Button(left_frame, textvariable=http_response_text, padx=0, pady=0,
+                                 command=lambda: [http_response_report()])
 http_response_text.set("HTTP Responses")
 protocolview_text = tk.StringVar()
 protocol_graphs = tk.Label(left_frame, text="Protocol Graphs", bg="blue", fg="white")
