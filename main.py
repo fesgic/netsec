@@ -2,6 +2,9 @@ import sys
 import threading
 
 import matplotlib.pyplot
+from matplotlib.backends._backend_tk import NavigationToolbar2Tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 from scapy.layers.dns import DNS
 
 lock = threading.Lock()
@@ -89,7 +92,7 @@ def traffic_scapy(interf):
                 db_Info = connection.get_server_info()
                 print("Connected to mysql server version", db_Info)
             cursor = connection.cursor()
-            if HTTP in pkt and HTTPResponse in pkt:
+            if HTTP in pkt:
                 reports_canvas.create_text(100, 10, fill="darkblue", font="Times 20 italic bold",
                                            text="Click the bubbles that are multiples of two.\n")
                 insert_query = f"""
@@ -98,6 +101,22 @@ def traffic_scapy(interf):
                             """
                 cursor.execute(insert_query)
                 connection.commit()
+                if HTTPRequest in pkt:
+                    insert_query = f"""
+                           insert into http_request (src, dst, src_ip, dst_ip, protocol, http_method, request_path, time_stamp)
+                                       values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "HTTP", 
+                                       "{pkt[HTTPRequest].Method.decode()}", "{pkt[HTTPRequest].Path.decode()}", "{formatted_date}");
+                            """
+                    cursor.execute(insert_query)
+                    connection.commit()
+                if HTTPResponse in pkt:
+                    insert_query = f"""
+                           insert into http_response (src, dst, src_ip, dst_ip, protocol, http_statuscode, status_code_reason, time_stamp)
+                                       values ("{pkt.src}","{pkt.dst}","{pkt[IP].src}", "{pkt[IP].dst}", "HTTP", 
+                                       "{pkt[HTTPResponse].Status_Code.decode()}" , "{pkt[HTTPResponse].Reason_Phrase.decode()}", "{formatted_date}");
+                            """
+                    cursor.execute(insert_query)
+                    connection.commit()
             elif ARP in pkt and pkt[ARP].op == 1:
                 insert_query = f"""
                            insert into traffic (src, dst, src_ip, dst_ip, protocol, time_stamp)
@@ -181,7 +200,11 @@ def live_traffic():
         tree.heading("#5", text="PROTOCOL")
         tree.column("#6", anchor=tk.CENTER)
         tree.heading("#6    ", text="TIMESTAMP")
-        tree.pack(fill=BOTH)
+        tree.pack(side=LEFT)
+        scroll = ttk.Scrollbar(reports_canvas, orient="vertical", command=tree.yview)
+        scroll.pack(side='right', fill='y')
+
+        tree.configure(yscrollcommand=scroll.set)
         for row in records:
             tree.insert("", tk.END, values=row)
 
@@ -214,9 +237,9 @@ def traffic_overview():
 # protocol_overview
 # graph of protocol type over time
 def protocol_overview():
-    protocolview_button["state"] = ACTIVE
-    livecap_button["state"] = NORMAL
-    trafficview_button["state"] = NORMAL
+    #protocolview_button["state"] = ACTIVE
+    #livecap_button["state"] = NORMAL
+    #trafficview_button["state"] = NORMAL
 
     def plotting_traf():
         while protocolview_button["state"] == ACTIVE:
@@ -268,16 +291,33 @@ def protocol_overview():
                         httpsy.append(0)
                         arpy.append(0)
                     timex.append(a)
-                plt.cla()
+                fig = Figure(figsize=(12, 6),
+                             dpi=100)
+                plt1 = fig.add_subplot(1,1,1)
+
+                plt1.cla()
                 print(f"{httpy}\n{arpy}\n{dnsy}\n{timex}")
-                matplotlib.pyplot.title("Protocol Graph")
-                matplotlib.pyplot.xlabel("Time")
-                matplotlib.pyplot.ylabel("Protocol")
-                plt.plot(timex, arpy, label="ARP", color="blue")
-                plt.plot(timex, httpy, label="HTTP", linestyle=":", color="red")
-                plt.plot(timex, httpsy, label="HTTPS", linestyle="-.", color="green")
-                plt.plot(timex, dnsy, label="DNS", color="yellow")
-                plt.show()
+                plt1.set_title("Protocol Graph")
+                plt1.set_xlabel("Time")
+                plt1.set_ylabel("Protocol")
+                plt1.plot(timex, arpy, label="ARP", color="blue")
+                plt1.plot(timex, httpy, label="HTTP", linestyle=":", color="red")
+                plt1.plot(timex, httpsy, label="HTTPS", linestyle="-.", color="green")
+                plt1.plot(timex, dnsy, label="DNS", color="yellow")
+                # creating the Tkinter canvas
+                # containing the Matplotlib figure
+                canvas = FigureCanvasTkAgg(fig,
+                                           master=reports_canvas)
+                canvas.draw()
+                # placing the canvas on the Tkinter window
+                canvas.get_tk_widget().pack()
+                # creating the Matplotlib toolbar
+                #toolbar = NavigationToolbar2Tk(canvas,
+                 #                              reports_canvas)
+                # placing the toolbar on the Tkinter window
+                #toolbar.update()
+                #canvas.get_tk_widget().pack()
+
                 lock.release()
             except Error as e:
                 print("Error Connecting to Mysql", e)
@@ -304,7 +344,7 @@ root.grid_columnconfigure(0, weight=1)
 topmost_frame.grid(row=0, sticky='ew')
 # top_frame.grid(row=1, sticky='new')
 left_frame.grid(row=2, sticky='nsw')
-canvas_frame.grid(row=2, sticky='nse')
+canvas_frame.grid(row=2, sticky='ne')
 report_frame.grid(row=5, sticky='ew')
 
 # create widgets for topmost frame
@@ -364,7 +404,16 @@ trafficview_text = tk.StringVar()
 trafficview_button = tk.Button(left_frame, textvariable=trafficview_text, padx=0, pady=0,
                                command=lambda: [traffic_overview()])
 trafficview_text.set("Traffic Overview")
+
+http_label = tk.Label(left_frame, text='HTTP Protocol', width=15, height=2, bg="blue", fg="white")
+http_request_text = tk.StringVar()
+http_request_button = tk.Button(left_frame, textvariable=http_request_text, padx=0, pady=0)
+http_request_text.set("HTTP Requests")
+http_response_text = tk.StringVar()
+http_response_button = tk.Button(left_frame, textvariable=http_response_text, padx=0, pady=0)
+http_response_text.set("HTTP Responses")
 protocolview_text = tk.StringVar()
+protocol_graphs = tk.Label(left_frame, text="Protocol Graphs", bg="blue", fg="white")
 protocolview_button = tk.Button(left_frame, textvariable=protocolview_text, padx=0, pady=0,
                                 command=lambda: [protocol_overview()])
 protocolview_text.set("Protocol Overview")
@@ -372,7 +421,11 @@ protocolview_text.set("Protocol Overview")
 # layout for left frame widgets
 livecap_button.grid(row=0, column=1, columnspan=2)
 trafficview_button.grid(row=1, column=1, columnspan=2)
-protocolview_button.grid(row=3, column=1, columnspan=2)
+http_label.grid(row=2, column=1, columnspan=2)
+http_request_button.grid(row=3, column=1, columnspan=2)
+http_response_button.grid(row=4, column=1, columnspan=2)
+protocol_graphs.grid(row=5, column=1, rowspan=2)
+protocolview_button.grid(row=6, column=1, columnspan=2)
 
 # create widgets for right frame
 #v = tk.Scrollbar(canvas_frame, orient='vertical')
@@ -394,7 +447,52 @@ reports_canvas.pack(side=LEFT, fill=BOTH)
 # reports_canvas.grid()
 
 def download_reports():
-    print("download_reports")
+    answer = tk.simpledialog.askstring("Input", "Enter name of report",
+                                    parent=root)
+    try:
+        def fetch_table_data(table_name):
+            connection = mysql.connector.connect(host='localhost',
+                                             database='netsec',
+                                             user='festus',
+                                             password='fg68211h')
+            if connection.is_connected():
+                db_Info = connection.get_server_info()
+                print("Connected to mysql server version", db_Info)
+
+            cursor = connection.cursor()
+            cursor.execute(f"select * from {table_name};")
+
+            header = [row[0] for row in cursor.description]
+
+            rows = cursor.fetchall()
+
+            connection.close()
+            cursor.close()
+            return header, rows
+
+        def export_table(table_name):
+            header, rows = fetch_table_data(table_name)
+
+            #create csv file
+            f = open(f"{answer}_{table_name}.csv", "w")
+
+            #write header
+            f.write(','.join(header) + '\n')
+
+            #insert data
+            for row in rows:
+                f.write(','.join(str(r) for r in row) +'\n')
+
+            f.close()
+
+
+        export_table("traffic")
+        export_table("http_request")
+        export_table("http_response")
+
+    except Error as e:
+        print(e)
+
 
 
 # create widgets for report_frame
