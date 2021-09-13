@@ -165,6 +165,12 @@ def traffic_scapy(interf):
 
 # display live traffic to interface
 def live_traffic():
+    def clear_plot():
+        global canvas
+        if canvas:
+            for child in reports_canvas.winfo_children():
+                child.destroy()
+    clear_plot()
     try:
         connection = mysql.connector.connect(
             host="localhost",
@@ -209,15 +215,14 @@ def live_traffic():
         for row in records:
             tree.insert("", tk.END, values=row)
 
+        # lst = records
 
-        #lst = records
-
-        #for i in range(len(records)):
+        # for i in range(len(records)):
         #    for j in range(len(records[0])):
-          #      live_tr = tk.Entry(reports_canvas, width=1, fg='blue',
+        #      live_tr = tk.Entry(reports_canvas, width=1, fg='blue',
         #                           font=('Arial', 16))
-         #       live_tr.grid(row=i, column=j)
-          #      live_tr.insert(END, lst[i][j])
+        #       live_tr.grid(row=i, column=j)
+        #      live_tr.insert(END, lst[i][j])
 
 
     except Error as e:
@@ -237,11 +242,18 @@ def traffic_overview():
 
 # protocol_overview
 # graph of protocol type over time
+
 def protocol_overview():
-    #protocolview_button["state"] = ACTIVE
-    #livecap_button["state"] = NORMAL
-    #trafficview_button["state"] = NORMAL
-    #reports_canvas.delete("all")
+    # protocolview_button["state"] = ACTIVE
+    # livecap_button["state"] = NORMAL
+    # trafficview_button["state"] = NORMAL
+    # reports_canvas.delete("all")
+    def clear_plot():
+        global canvas
+        if canvas:
+            for child in reports_canvas.winfo_children():
+                child.destroy()
+    clear_plot()
     def plotting_traf():
         while protocolview_button["state"] == ACTIVE:
             try:
@@ -294,9 +306,9 @@ def protocol_overview():
                     timex.append(a)
                 fig = Figure(figsize=(12, 6),
                              dpi=100)
-                plt1 = fig.add_subplot(1,1,1)
-
-                plt1.cla()
+                fig.clear(True)
+                plt1 = fig.add_subplot(1, 1, 1)
+                # plt1.cla()
                 print(f"{httpy}\n{arpy}\n{dnsy}\n{timex}")
                 plt1.set_title("Protocol Graph")
                 plt1.set_xlabel("Time")
@@ -305,20 +317,23 @@ def protocol_overview():
                 plt1.plot(timex, httpy, label="HTTP", linestyle=":", color="red")
                 plt1.plot(timex, httpsy, label="HTTPS", linestyle="-.", color="green")
                 plt1.plot(timex, dnsy, label="DNS", color="yellow")
+
                 # creating the Tkinter canvas
                 # containing the Matplotlib figure
+
                 canvas = FigureCanvasTkAgg(fig,
                                            master=reports_canvas)
+                #reports_canvas.delete(canvas.get_tk_widget().destroy())
                 canvas.draw()
                 # placing the canvas on the Tkinter window
                 canvas.get_tk_widget().pack()
                 # creating the Matplotlib toolbar
-                #toolbar = NavigationToolbar2Tk(canvas,
-                 #                              reports_canvas)
+                # toolbar = NavigationToolbar2Tk(canvas,
+                #                              reports_canvas)
                 # placing the toolbar on the Tkinter window
-                #toolbar.update()
-                #canvas.get_tk_widget().pack()
-
+                # toolbar.update()
+                # canvas.get_tk_widget().pack()
+                #canvas.get_tk_widget().destroy()
                 lock.release()
             except Error as e:
                 print("Error Connecting to Mysql", e)
@@ -332,7 +347,15 @@ def protocol_overview():
     graph_plot.start()
 
 
+
+
 def http_request_report():
+    def clear_plot():
+        global canvas
+        if canvas:
+            for child in reports_canvas.winfo_children():
+                child.destroy()
+    clear_plot()
     try:
         connection = mysql.connector.connect(
             host="localhost",
@@ -381,7 +404,14 @@ def http_request_report():
             connection.close()
             print("My sql connection closed")
 
+
 def http_response_report():
+    def clear_plot():
+        global canvas
+        if canvas:
+            for child in reports_canvas.winfo_children():
+                child.destroy()
+    clear_plot()
     try:
         connection = mysql.connector.connect(
             host="localhost",
@@ -507,7 +537,8 @@ trafficview_text.set("Traffic Overview")
 
 http_label = tk.Label(left_frame, text='HTTP Protocol', width=15, height=2, bg="blue", fg="white")
 http_request_text = tk.StringVar()
-http_request_button = tk.Button(left_frame, textvariable=http_request_text, padx=0, pady=0, command=lambda:[http_request_report()])
+http_request_button = tk.Button(left_frame, textvariable=http_request_text, padx=0, pady=0,
+                                command=lambda: [http_request_report()])
 http_request_text.set("HTTP Requests")
 http_response_text = tk.StringVar()
 http_response_button = tk.Button(left_frame, textvariable=http_response_text, padx=0, pady=0,
@@ -529,11 +560,11 @@ protocol_graphs.grid(row=5, column=1, rowspan=2)
 protocolview_button.grid(row=6, column=1, columnspan=2)
 
 # create widgets for right frame
-#v = tk.Scrollbar(canvas_frame, orient='vertical')
-#v.pack(side=RIGHT, fill=Y)
+# v = tk.Scrollbar(canvas_frame, orient='vertical')
+# v.pack(side=RIGHT, fill=Y)
 # v.grid(column=6,rowspan=5, row=0)
 reports_canvas = tk.Canvas(canvas_frame, bg="green", width=1216, height=600)
-#v.config(command=reports_canvas.yview)
+# v.config(command=reports_canvas.yview)
 reports_canvas.pack(side=LEFT, fill=BOTH)
 
 
@@ -549,13 +580,13 @@ reports_canvas.pack(side=LEFT, fill=BOTH)
 
 def download_reports():
     answer = tk.simpledialog.askstring("Input", "Enter name of report",
-                                    parent=root)
+                                       parent=root)
     try:
         def fetch_table_data(table_name):
             connection = mysql.connector.connect(host='localhost',
-                                             database='netsec',
-                                             user='festus',
-                                             password='fg68211h')
+                                                 database='netsec',
+                                                 user='festus',
+                                                 password='fg68211h')
             if connection.is_connected():
                 db_Info = connection.get_server_info()
                 print("Connected to mysql server version", db_Info)
@@ -574,21 +605,20 @@ def download_reports():
         def export_table(table_name):
             header, rows = fetch_table_data(table_name)
 
-            #open folder to save file
+            # open folder to save file
             basepath = "./Downloaded_Reports"
-            report_name =  os.path.join(basepath, f"{answer}_{table_name}.csv")
-            #create csv file
+            report_name = os.path.join(basepath, f"{answer}_{table_name}.csv")
+            # create csv file
             f = open(report_name, "w")
 
-            #write header
+            # write header
             f.write(','.join(header) + '\n')
 
-            #insert data
+            # insert data
             for row in rows:
-                f.write(','.join(str(r) for r in row) +'\n')
+                f.write(','.join(str(r) for r in row) + '\n')
 
             f.close()
-
 
         export_table("traffic")
         export_table("http_request")
@@ -596,7 +626,6 @@ def download_reports():
 
     except Error as e:
         print(e)
-
 
 
 # create widgets for report_frame
